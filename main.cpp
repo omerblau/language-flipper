@@ -1,16 +1,25 @@
+// Windows APIs
 #include <windows.h>
+
+// I/O & console
 #include <fcntl.h>   // _O_U16TEXT
 #include <io.h>      // _setmode
 #include <iostream>
+
+// Containers & strings
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <thread>    // for sleep
-#include <chrono>    // for milliseconds
+
+// Threading & timing
+#include <thread>
+#include <chrono>
 
 // ───────────────────────────────────────── Layout IDs
-constexpr char LAYOUT_HE[] = "0000040D";
-constexpr char LAYOUT_EN[] = "00000409";
+namespace config {
+    constexpr char LAYOUT_HE[] = "0000040D";
+    constexpr char LAYOUT_EN[] = "00000409";
+}
 
 // ───────────────────────────────────────── Key-maps (single wchar)
 const std::unordered_map<wchar_t, wchar_t> EN_TO_HE = {
@@ -109,101 +118,96 @@ std::wstring getHighlightedText() {
 }
 
 void flushModifiers() {
-    // Release any stuck Ctrl or Alt keys so our Ctrl+C isn't combined with the hotkey
     INPUT ups[2]{};
 
-    ups[0].type                = INPUT_KEYBOARD;
-    ups[0].ki.wVk              = VK_CONTROL;
-    ups[0].ki.dwFlags          = KEYEVENTF_KEYUP;
+    // Release Ctrl
+    ups[0].type = INPUT_KEYBOARD;
+    ups[0].ki.wVk = VK_CONTROL;
+    ups[0].ki.dwFlags = KEYEVENTF_KEYUP;
 
-    ups[1].type                = INPUT_KEYBOARD;
-    ups[1].ki.wVk              = VK_MENU;                // Alt
-    ups[1].ki.dwFlags          = KEYEVENTF_KEYUP;
+    // Release Alt
+    ups[1].type = INPUT_KEYBOARD;
+    ups[1].ki.wVk = VK_MENU;
+    ups[1].ki.dwFlags = KEYEVENTF_KEYUP;
 
     SendInput(2, ups, sizeof(INPUT));
 }
 
+// Wait (up to timeoutMs) for the clipboard sequence to change
+static DWORD waitForNewClipboard(DWORD before, int timeoutMs = 200) {
+    auto deadline = std::chrono::steady_clock::now()
+                    + std::chrono::milliseconds(timeoutMs);
+    while (GetClipboardSequenceNumber() == before
+           && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    return GetClipboardSequenceNumber();
+}
 
-// void run_once() {
-//     std::wstring selected;
-//     DWORD before = GetClipboardSequenceNumber();
-//
-//     sendCtrlC();
-//
-//     auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(120);
-//     while (GetClipboardSequenceNumber() == before &&
-//            std::chrono::steady_clock::now() < deadline) {
-//         std::this_thread::sleep_for(std::chrono::milliseconds(5));
-//            }
-//
-//     if (GetClipboardSequenceNumber() == before) {
-//         std::wcerr << L"No new text selected. Skipping.\n";
-//         return;
-//     }
-//
-//     selected = readClipboard();
-//     std::wcout << L"selected: " << selected << L"\n";
-//
-//     LANGID lang = activeLang();
-//     if (lang == 0x0409) {
-//         std::wstring engFixed = fix(selected, EN_TO_HE);
-//         std::wcout << L"EN→HE: " << engFixed << L"\n";
-//         typeWide(engFixed);
-//         if (flipTo(LAYOUT_HE)) std::wcout << L"Layout flipped ► Hebrew\n";
-//         else std::wcerr << L"Flip failed\n";
-//     }
-//     else if (lang == 0x040D) {
-//         std::wstring hebFixed = fix(selected, HE_TO_EN);
-//         std::wcout << L"HE→EN: " << hebFixed << L"\n";
-//         typeWide(hebFixed);
-//         if (flipTo(LAYOUT_EN)) std::wcout << L"Layout flipped ► English\n";
-//         else std::wcerr << L"Flip failed\n";
-//     }
-//     else {
-//         std::wcerr << L"Unsupported layout. Exit.\n";
-//     }
-// }
-
-//
-void run_once() {
-    std::wstring selected;
-    DWORD before = GetClipboardSequenceNumber();
+// Copy the current selection and return the newly‐copied text (or empty if none)
+static std::wstring copyAndFetchSelection() {
+    // 1) clear any stuck modifiers
     flushModifiers();
+
+    // 2) note current clipboard version
+    DWORD before = GetClipboardSequenceNumber();
+
+    // 3) send Ctrl+C
     sendCtrlC();
 
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(200);
-    while (GetClipboardSequenceNumber() == before &&
-           std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-           }
+    // 4) wait for it to change
+    DWORD after = waitForNewClipboard(before);
+    if (after == before) {
+        // nothing new
+        return L"";
+    }
 
-    if (GetClipboardSequenceNumber() == before) {
+    // 5) read & return
+    return readClipboard();
+}
+
+// Given the raw selected text, fix‐and‐type it, then flip the layout
+static void processAndType(const std::wstring &selected) {
+    // echo what we got
+    std::wcout << L"selected: " << selected << L"\n";
+
+    // detect layout
+    LANGID lang = activeLang();
+    bool flipped = false;
+
+    if (lang == 0x0409) {
+        // EN→HE
+        auto out = fix(selected, EN_TO_HE);
+        std::wcout << L"EN→HE: " << out << L"\n";
+        typeWide(out);
+        flipped = flipTo(config::LAYOUT_HE);
+        if (flipped) std::wcout << L"Layout flipped ► Hebrew\n";
+    } else if (lang == 0x040D) {
+        // HE→EN
+        auto out = fix(selected, HE_TO_EN);
+        std::wcout << L"HE→EN: " << out << L"\n";
+        typeWide(out);
+        flipped = flipTo(config::LAYOUT_EN);
+        if (flipped) std::wcout << L"Layout flipped ► English\n";
+    } else {
+        std::wcerr << L"Unsupported layout. Exit.\n";
+    }
+
+    if (!flipped && (lang == 0x0409 || lang == 0x040D)) {
+        std::wcerr << L"Flip failed\n";
+    }
+}
+
+// ─── Simplified run_once ────────────────────────────────────────────
+void run_once() {
+    auto selected = copyAndFetchSelection();
+    if (selected.empty()) {
         std::wcerr << L"No new text selected. Skipping.\n";
         return;
     }
-
-    selected = readClipboard();
-    std::wcout << L"selected: " << selected << L"\n";
-
-    LANGID lang = activeLang();
-    if (lang == 0x0409) {
-        std::wstring engFixed = fix(selected, EN_TO_HE);
-        std::wcout << L"EN→HE: " << engFixed << L"\n";
-        typeWide(engFixed);
-        if (flipTo(LAYOUT_HE)) std::wcout << L"Layout flipped ► Hebrew\n";
-        else std::wcerr << L"Flip failed\n";
-    }
-    else if (lang == 0x040D) {
-        std::wstring hebFixed = fix(selected, HE_TO_EN);
-        std::wcout << L"HE→EN: " << hebFixed << L"\n";
-        typeWide(hebFixed);
-        if (flipTo(LAYOUT_EN)) std::wcout << L"Layout flipped ► English\n";
-        else std::wcerr << L"Flip failed\n";
-    }
-    else {
-        std::wcerr << L"Unsupported layout. Exit.\n";
-    }
+    processAndType(selected);
 }
+
 
 // ───────────────────────────────────────── MAIN
 int main() {
