@@ -1,0 +1,33 @@
+# CLion/project files
+.idea/
+*.iml
+
+# CMake build artifacts
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+Makefile
+
+# CLion’s default build dir
+cmake-build-debug/
+
+# (optional) if you have other build configurations
+cmake-build-release/
+cmake-build-*
+
+# Compiled objects and binaries
+*.o
+*.obj
+*.so
+*.a
+*.lib
+*.dll
+*.exe
+*.out
+
+# Logs, editor swap files, OS cruft
+*.log
+*.swp
+.DS_Store
+Thumbs.db
