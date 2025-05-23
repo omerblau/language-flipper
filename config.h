@@ -6,12 +6,24 @@
 
 
 namespace config {
-    // ─── Layout IDs ───────────────────────────────────────────────────────
+    /// ─── Layout IDs ───────────────────────────────────────────────────────
     constexpr char LAYOUT_HE[] = "0000040D";
     constexpr char LAYOUT_EN[] = "00000409";
 
-    // ─── Hotkey settings ─────────────────────────────────────────────────
+
+
+    /// ─── timing and timeouts ──────────────────────────────────────────────
+    // How long we’ll wait (in milliseconds) for a new clipboard update
+    constexpr int CLIPBOARD_POLL_TIMEOUT_MS  = 200;
+
+    // How often we poll for an update
+    constexpr int CLIPBOARD_POLL_INTERVAL_MS = 5;
+
+
+
+    /// ─── Hotkey settings ─────────────────────────────────────────────────
     constexpr int HOTKEY_ID         = 1;
+
     // Combine any of MOD_CONTROL, MOD_ALT, MOD_SHIFT, MOD_WIN (bitwise-OR)
     // e.g. MOD_CONTROL | MOD_ALT  for Ctrl+Alt
     constexpr UINT HOTKEY_MODIFIERS = MOD_CONTROL | MOD_SHIFT;
@@ -20,7 +32,9 @@ namespace config {
     //   'A'–'Z' for letters, VK_F1–VK_F24, VK_OEM_* for punctuation, etc.
     constexpr UINT HOTKEY_VK = 'B';
 
-    // ─── keys mapping ─────────────────────────────────────────────────
+
+
+    /// ─── keys mapping ─────────────────────────────────────────────────
     // the map from lang 1 -> lang 2 will auto generate
     const std::unordered_map<wchar_t, wchar_t> EN_TO_HE = {
         {L'q', L'/'}, {L'w', L'\''}, {L'e', L'ק'}, {L'r', L'ר'},
