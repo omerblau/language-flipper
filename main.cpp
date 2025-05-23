@@ -1,3 +1,5 @@
+#include "config.h"
+
 // Windows APIs
 #include <windows.h>
 
@@ -15,35 +17,26 @@
 #include <thread>
 #include <chrono>
 
-// ───────────────────────────────────────── Layout IDs
-namespace config {
-    constexpr char LAYOUT_HE[] = "0000040D";
-    constexpr char LAYOUT_EN[] = "00000409";
+
+// ──── lang 2 -> lang 1 map generations ───────────────────────────────
+static std::unordered_map<wchar_t, wchar_t> makeHeToEnMap() {
+    std::unordered_map<wchar_t, wchar_t> map;
+    map.reserve(config::EN_TO_HE.size());
+    for (auto const &pair: config::EN_TO_HE) {
+        map[pair.second] = pair.first;
+    }
+    return map;
 }
+const std::unordered_map<wchar_t, wchar_t> HE_TO_EN = makeHeToEnMap();
+// ─────────────────────────────────────────────────────────────────────
 
-// ───────────────────────────────────────── Key-maps (single wchar)
-const std::unordered_map<wchar_t, wchar_t> EN_TO_HE = {
-    {L'q', L'/'}, {L'w', L'\''}, {L'e', L'ק'}, {L'r', L'ר'}, {L't', L'א'},
-    {L'y', L'ט'}, {L'u', L'ו'}, {L'i', L'ן'}, {L'o', L'ם'}, {L'p', L'פ'},
-    {L'a', L'ש'}, {L's', L'ד'}, {L'd', L'ג'}, {L'f', L'כ'}, {L'g', L'ע'},
-    {L'h', L'י'}, {L'j', L'ח'}, {L'k', L'ל'}, {L'l', L'ך'}, {L';', L'ף'},
-    {L'z', L'ז'}, {L'x', L'ס'}, {L'c', L'ב'}, {L'v', L'ה'}, {L'b', L'נ'},
-    {L'n', L'מ'}, {L'm', L'צ'}, {L',', L'ת'}, {L'.', L'ץ'}
-};
-const std::unordered_map<wchar_t, wchar_t> HE_TO_EN = [] {
-    std::unordered_map<wchar_t, wchar_t> r;
-    for (auto [en, he]: EN_TO_HE) r[he] = en;
-    return r;
-}();
 
-// ───────────────────────────────────────── Helpers
 LANGID activeLang() {
     HWND h = GetForegroundWindow();
     return LOWORD(GetKeyboardLayout(GetWindowThreadProcessId(h, nullptr)));
 }
 
-std::wstring fix(const std::wstring &src,
-                 const std::unordered_map<wchar_t, wchar_t> &map) {
+std::wstring fix(const std::wstring &src, const std::unordered_map<wchar_t, wchar_t> &map) {
     std::wstring out;
     out.reserve(src.size());
     for (wchar_t ch: src) {
@@ -118,19 +111,33 @@ std::wstring getHighlightedText() {
 }
 
 void flushModifiers() {
-    INPUT ups[2]{};
+    std::vector<INPUT> ups;
+    ups.reserve(3);
 
-    // Release Ctrl
-    ups[0].type = INPUT_KEYBOARD;
-    ups[0].ki.wVk = VK_CONTROL;
-    ups[0].ki.dwFlags = KEYEVENTF_KEYUP;
+    if constexpr (config::HOTKEY_MODIFIERS & MOD_CONTROL) {
+        INPUT i{};
+        i.type = INPUT_KEYBOARD;
+        i.ki.wVk = VK_CONTROL;
+        i.ki.dwFlags = KEYEVENTF_KEYUP;
+        ups.push_back(i);
+    }
+    if constexpr (config::HOTKEY_MODIFIERS & MOD_ALT) {
+        INPUT i{};
+        i.type = INPUT_KEYBOARD;
+        i.ki.wVk = VK_MENU;
+        i.ki.dwFlags = KEYEVENTF_KEYUP;
+        ups.push_back(i);
+    }
+    if constexpr (config::HOTKEY_MODIFIERS & MOD_SHIFT) {
+        INPUT i{};
+        i.type = INPUT_KEYBOARD;
+        i.ki.wVk = VK_SHIFT;
+        i.ki.dwFlags = KEYEVENTF_KEYUP;
+        ups.push_back(i);
+    }
 
-    // Release Alt
-    ups[1].type = INPUT_KEYBOARD;
-    ups[1].ki.wVk = VK_MENU;
-    ups[1].ki.dwFlags = KEYEVENTF_KEYUP;
-
-    SendInput(2, ups, sizeof(INPUT));
+    if (!ups.empty())
+        SendInput(static_cast<UINT>(ups.size()), ups.data(), sizeof(INPUT));
 }
 
 // Wait (up to timeoutMs) for the clipboard sequence to change
@@ -177,7 +184,7 @@ static void processAndType(const std::wstring &selected) {
 
     if (lang == 0x0409) {
         // EN→HE
-        auto out = fix(selected, EN_TO_HE);
+        auto out = fix(selected, config::EN_TO_HE);
         std::wcout << L"EN→HE: " << out << L"\n";
         typeWide(out);
         flipped = flipTo(config::LAYOUT_HE);
@@ -208,31 +215,38 @@ void run_once() {
     processAndType(selected);
 }
 
+static bool registerHotkey() {
+    // build a human‐readable name, e.g. "Ctrl+Alt+B"
+    std::wstring name;
+    if constexpr (config::HOTKEY_MODIFIERS & MOD_CONTROL) name += L"Ctrl+";
+    if constexpr (config::HOTKEY_MODIFIERS & MOD_ALT) name += L"Alt+";
+    if constexpr (config::HOTKEY_MODIFIERS & MOD_SHIFT) name += L"Shift+";
+    name += static_cast<wchar_t>(config::HOTKEY_VK);
+    if (!RegisterHotKey(nullptr, config::HOTKEY_ID, config::HOTKEY_MODIFIERS, config::HOTKEY_VK)) {
+        std::wcerr << L"Failed to register hotkey " << name << L"\n";
+        return false;
+    }
+    std::wcout << L"Hotkey registered " << name << L"\n";
+    return true;
+}
 
-// ───────────────────────────────────────── MAIN
 int main() {
     // enable UTF-16 output
     _setmode(_fileno(stdout), _O_U16TEXT);
     _setmode(_fileno(stderr), _O_U16TEXT);
 
-    // register Ctrl+Alt+B as our hotkey (ID = 1)
-    if (!RegisterHotKey(NULL, 1, MOD_CONTROL | MOD_ALT, 'B')) {
-        std::wcerr << L"Failed to register hotkey Ctrl+Alt+B\n";
+    if (!registerHotkey()) {
         return 1;
     }
 
-    std::wcout << L"Press Ctrl+Alt+B to fix the highlighted text in the foreground window...\n";
-
     // message loop — waits efficiently for WM_HOTKEY
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        if (msg.message == WM_HOTKEY && msg.wParam == 1) {
-            // std::this_thread::sleep_for(std::chrono::milliseconds(300));
-            run_once(); // your existing single-operation function
+    while (GetMessage(&msg, nullptr, 0, 0)) {
+        if (msg.message == WM_HOTKEY && msg.wParam == config::HOTKEY_ID) {
+            run_once();
         }
     }
 
-    // (we never actually get here, but if we did:)
-    UnregisterHotKey(NULL, 1);
+    UnregisterHotKey(nullptr, config::HOTKEY_ID);
     return 0;
 }
