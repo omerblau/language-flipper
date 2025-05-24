@@ -3,20 +3,10 @@
 #include "config.h"
 #include "utils.h"
 
-// Windows APIs
 #include <windows.h>
-
-// I/O & console
 #include <fcntl.h>   // _O_U16TEXT
 #include <io.h>      // _setmode
 #include <iostream>
-
-// Containers & strings
-#include <string>
-
-// Threading & timing
-#include <chrono>
-
 
 int main() {
     // enable UTF-16 output
