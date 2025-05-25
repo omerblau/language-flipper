@@ -10,10 +10,9 @@ if (MINGW)
             "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
 endif ()
 
-# ─── Your executable ───────────────────────────────────────────────
 add_executable(language_flipper
         main.cpp
         utils.cpp
-        utils.h    # headers don’t strictly need listing, but it’s harmless
+        utils.h
         config.h
 )
