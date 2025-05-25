@@ -17,6 +17,7 @@ enum class LayoutRole { Primary, Secondary, Unsupported };
 constexpr LANGID LANGID_PRIMARY = MAKELANGID(config::LANG_PRIMARY, config::SUBLANG_PRIMARY);
 constexpr LANGID LANGID_SECONDARY = MAKELANGID(config::LANG_SECONDARY, config::SUBLANG_SECONDARY);
 
+constexpr int  HOTKEY_ID = 1;
 /// Convert a LANGID (e.g. 0x0409) to its 8-digit KLID string ("00000409").
 std::string makeLayoutString(const LANGID id);
 

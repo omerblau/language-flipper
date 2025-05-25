@@ -10,6 +10,11 @@
 #include <string>
 
 namespace config {
+    // ─── Debug / console toggle ────────────────────────────────────
+    // false → run entirely hidden, no console, no prints
+    // true  → keep console open, show all prints
+    constexpr bool DEBUG_MODE = false;
+
 
     // ─── Primary / “from” Layout ─────────────────────────────────────────────
     //
@@ -71,7 +76,6 @@ namespace config {
     //
     // To change the shortcut, edit MODIFIERS and/or VK here.
     //
-    constexpr int  HOTKEY_ID        = 1;
     constexpr UINT HOTKEY_MODIFIERS = MOD_CONTROL;  // e.g. MOD_CONTROL | MOD_ALT
     constexpr UINT HOTKEY_VK        = 'M';          // e.g. 'M' for Ctrl+M
 

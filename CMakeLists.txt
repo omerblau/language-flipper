@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.31)
-project(first_cmake_project LANGUAGES CXX)
+project(language_flipper LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 
 # ─── Statically link MinGW runtimes so no extra DLLs are needed ───
@@ -11,7 +11,7 @@ if (MINGW)
 endif ()
 
 # ─── Your executable ───────────────────────────────────────────────
-add_executable(first_cmake_project
+add_executable(language_flipper
         main.cpp
         utils.cpp
         utils.h    # headers don’t strictly need listing, but it’s harmless

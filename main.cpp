@@ -9,22 +9,27 @@
 #include <iostream>
 
 int main() {
-    // enable UTF-16 output
-    _setmode(_fileno(stdout), _O_U16TEXT);
-    _setmode(_fileno(stderr), _O_U16TEXT);
+    if (config::DEBUG_MODE) {
+        // enable UTF-16 output
+        _setmode(_fileno(stdout), _O_U16TEXT);
+        _setmode(_fileno(stderr), _O_U16TEXT);
+    } else {
+        FreeConsole();
+    }
 
     if (!registerHotkey()) {
+        MessageBoxA(nullptr, "Could not register hotkey", "Error", MB_ICONERROR);
         return 1;
     }
-    // message loop — waits efficiently
+
     // Blocks until a message arrives for any window or thread queue
     MSG msg;
     while (GetMessage(&msg, nullptr, 0, 0)) {
-        if (msg.message == WM_HOTKEY && msg.wParam == config::HOTKEY_ID) {
+        if (msg.message == WM_HOTKEY && msg.wParam == HOTKEY_ID) {
             run_once();
         }
     }
 
-    UnregisterHotKey(nullptr, config::HOTKEY_ID);
+    UnregisterHotKey(nullptr, HOTKEY_ID);
     return 0;
 }

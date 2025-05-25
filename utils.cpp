@@ -43,7 +43,7 @@ std::unordered_map<wchar_t, wchar_t> makeSecondaryToPrimaryMap() {
 std::wstring readClipboard() {
     // 1) Open the clipboard
     if (!OpenClipboard(nullptr)) {
-        std::wcerr << L"[readClipboard] Failed to open clipboard\n";
+        if (config::DEBUG_MODE) std::wcerr << L"[readClipboard] Failed to open clipboard\n";
         return L"";
     }
 
@@ -111,15 +111,24 @@ void flushModifiers() {
     ups.reserve(3);
 
     if constexpr (config::HOTKEY_MODIFIERS & MOD_CONTROL) {
-        INPUT i{}; i.type = INPUT_KEYBOARD; i.ki.wVk = VK_CONTROL; i.ki.dwFlags = KEYEVENTF_KEYUP;
+        INPUT i{};
+        i.type = INPUT_KEYBOARD;
+        i.ki.wVk = VK_CONTROL;
+        i.ki.dwFlags = KEYEVENTF_KEYUP;
         ups.push_back(i);
     }
     if constexpr (config::HOTKEY_MODIFIERS & MOD_ALT) {
-        INPUT i{}; i.type = INPUT_KEYBOARD; i.ki.wVk = VK_MENU;    i.ki.dwFlags = KEYEVENTF_KEYUP;
+        INPUT i{};
+        i.type = INPUT_KEYBOARD;
+        i.ki.wVk = VK_MENU;
+        i.ki.dwFlags = KEYEVENTF_KEYUP;
         ups.push_back(i);
     }
     if constexpr (config::HOTKEY_MODIFIERS & MOD_SHIFT) {
-        INPUT i{}; i.type = INPUT_KEYBOARD; i.ki.wVk = VK_SHIFT;   i.ki.dwFlags = KEYEVENTF_KEYUP;
+        INPUT i{};
+        i.type = INPUT_KEYBOARD;
+        i.ki.wVk = VK_SHIFT;
+        i.ki.dwFlags = KEYEVENTF_KEYUP;
         ups.push_back(i);
     }
 
@@ -131,10 +140,14 @@ void sendCtrlC() {
     INPUT inputs[4] = {};
 
     // Ctrl down, C down, C up, Ctrl up
-    inputs[0].type       = INPUT_KEYBOARD; inputs[0].ki.wVk      = VK_CONTROL;
-    inputs[1].type       = INPUT_KEYBOARD; inputs[1].ki.wVk      = 'C';
-    inputs[2]            = inputs[1];      inputs[2].ki.dwFlags  = KEYEVENTF_KEYUP;
-    inputs[3]            = inputs[0];      inputs[3].ki.dwFlags  = KEYEVENTF_KEYUP;
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki.wVk = VK_CONTROL;
+    inputs[1].type = INPUT_KEYBOARD;
+    inputs[1].ki.wVk = 'C';
+    inputs[2] = inputs[1];
+    inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+    inputs[3] = inputs[0];
+    inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
 
     SendInput(4, inputs, sizeof(INPUT));
 }
@@ -145,12 +158,12 @@ void typeText(const std::wstring &text) {
     // Reserve space for two events per character to avoid resizing
     inputs.reserve(text.size() * 2);
 
-    for (const wchar_t ch : text) {
+    for (const wchar_t ch: text) {
         // Key‐down event (UNICODE scan code)
         INPUT keyDown{};
-        keyDown.type          = INPUT_KEYBOARD;
-        keyDown.ki.wScan      = ch;               // Unicode code point
-        keyDown.ki.dwFlags    = KEYEVENTF_UNICODE; // tell Windows it's a unicode wScan
+        keyDown.type = INPUT_KEYBOARD;
+        keyDown.ki.wScan = ch; // Unicode code point
+        keyDown.ki.dwFlags = KEYEVENTF_UNICODE; // tell Windows it's a unicode wScan
 
         // Key‐up event is identical, plus the KEYEVENTF_KEYUP flag:
         INPUT keyUp = keyDown;
@@ -222,9 +235,7 @@ void logTransformation(const std::wstring &orig, const std::wstring &transformed
                 << config::ROLE_NAME_PRIMARY
                 << L": " << transformed << L'\n';
     } else {
-        // fallback
-        std::wcout << L"Unsupported role. Output: "
-                << transformed << L'\n';
+        if (config::DEBUG_MODE) std::wcout << L"Unsupported role. Output: " << transformed << L'\n';
     }
 }
 
@@ -275,16 +286,12 @@ bool flipLayout(const LayoutRole from) {
     }
 
     // log the result
-    if (ok) {
-        std::wcout
-                << L"Layout flipped ► "
-                << fromName << L"→" << toName
-                << L"\n";
-    } else {
-        std::wcout
-                << L"Flip from "
-                << fromName << L" to " << toName
-                << L" failed\n";
+    if (config::DEBUG_MODE) {
+        if (ok) {
+            std::wcout << L"Layout flipped ► " << fromName << L"→" << toName << L"\n";
+        } else {
+            std::wcout << L"Flip from " << fromName << L" to " << toName << L" failed\n";
+        }
     }
 
     return ok;
@@ -296,12 +303,13 @@ bool flipLayout(const LayoutRole from) {
 void handleClipboardText(const std::wstring &selected) {
     const auto layout = detectLayout();
     if (layout == LayoutRole::Unsupported) {
-        std::wcerr << L"Unsupported layout. Aborting.\n";
+        if (config::DEBUG_MODE) std::wcerr << L"Unsupported layout. Aborting.\n";
         return;
     }
 
     const auto transformed = transformText(selected, layout);
-    logTransformation(selected, transformed, layout);
+
+    if (config::DEBUG_MODE) logTransformation(selected, transformed, layout);
     typeText(transformed);
 
     if (config::AUTO_FLIP_ON_CHANGE) {
@@ -316,18 +324,18 @@ bool registerHotkey() {
     if constexpr (config::HOTKEY_MODIFIERS & MOD_ALT) name += L"Alt+";
     if constexpr (config::HOTKEY_MODIFIERS & MOD_SHIFT) name += L"Shift+";
     name += static_cast<wchar_t>(config::HOTKEY_VK);
-    if (!RegisterHotKey(nullptr, config::HOTKEY_ID, config::HOTKEY_MODIFIERS, config::HOTKEY_VK)) {
-        std::wcerr << L"Failed to register hotkey " << name << L"\n";
+    if (!RegisterHotKey(nullptr, HOTKEY_ID, config::HOTKEY_MODIFIERS, config::HOTKEY_VK)) {
+        if (config::DEBUG_MODE) std::wcerr << L"Failed to register hotkey " << name << L"\n";
         return false;
     }
-    std::wcout << L"Hotkey registered " << name << L"\n";
+    if (config::DEBUG_MODE) std::wcout << L"Hotkey registered " << name << L"\n";
     return true;
 }
 
 void run_once() {
     const auto selected = copyAndFetchSelection();
     if (selected.empty()) {
-        std::wcerr << L"No new text selected. Skipping.\n";
+        if (config::DEBUG_MODE) std::wcerr << L"No new text selected. Skipping.\n";
         return;
     }
     handleClipboardText(selected);
