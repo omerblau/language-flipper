@@ -8,11 +8,12 @@ if (MINGW)
     # -static-libgcc / -static-libstdc++ embed libgcc and libstdc++
     set(CMAKE_EXE_LINKER_FLAGS
             "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
-endif ()
+endif()
 
 add_executable(language_flipper
         main.cpp
         utils.cpp
         utils.h
         config.h
+        config.cpp
 )

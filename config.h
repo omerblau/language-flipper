@@ -76,8 +76,17 @@ namespace config {
     //
     // To change the shortcut, edit MODIFIERS and/or VK here.
     //
-    constexpr UINT HOTKEY_MODIFIERS = MOD_CONTROL;  // e.g. MOD_CONTROL | MOD_ALT
-    constexpr UINT HOTKEY_VK        = 'M';          // e.g. 'M' for Ctrl+M
+    constexpr UINT BASIC_HOTKEY_MODIFIERS = MOD_CONTROL;  // e.g. MOD_CONTROL | MOD_ALT
+    constexpr UINT BASIC_HOTKEY_VK        = 'M';          // e.g. 'M' for Ctrl+M
+    constexpr int  BASIC_HOTKEY_ID        = 1;
+
+    constexpr UINT LINE_HOTKEY_MODIFIERS  = MOD_CONTROL | MOD_ALT;
+    constexpr UINT LINE_HOTKEY_VK         = 'M';
+    constexpr int  LINE_HOTKEY_ID         = 2;
+
+    constexpr UINT ALL_HOTKEY_MODIFIERS   = MOD_CONTROL | MOD_ALT;
+    constexpr UINT ALL_HOTKEY_VK          = 'N';
+    constexpr int  ALL_HOTKEY_ID          = 3;
 
     // ─── Auto‐flip toggle ─────────────────────────────────────────────────────
     //

@@ -86,9 +86,6 @@ DWORD waitForClipboardChange(const DWORD previousSequence) {
 }
 
 std::wstring copyAndFetchSelection() {
-    // clear any stuck modifiers
-    flushModifiers();
-
     const DWORD before = GetClipboardSequenceNumber();
 
     sendCtrlC();
@@ -106,25 +103,25 @@ std::wstring copyAndFetchSelection() {
 // ─── Input Simulation ──────────────────────────────────────────────────
 
 // Release any stuck modifier keys (Ctrl, Alt, Shift) in one batched SendInput call
-void flushModifiers() {
+void flushModifiers(UINT modifiers) {
     std::vector<INPUT> ups;
     ups.reserve(3);
 
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_CONTROL) {
+    if (modifiers & MOD_CONTROL) {
         INPUT i{};
         i.type = INPUT_KEYBOARD;
         i.ki.wVk = VK_CONTROL;
         i.ki.dwFlags = KEYEVENTF_KEYUP;
         ups.push_back(i);
     }
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_ALT) {
+    if (modifiers & MOD_ALT) {
         INPUT i{};
         i.type = INPUT_KEYBOARD;
         i.ki.wVk = VK_MENU;
         i.ki.dwFlags = KEYEVENTF_KEYUP;
         ups.push_back(i);
     }
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_SHIFT) {
+    if (modifiers & MOD_SHIFT) {
         INPUT i{};
         i.type = INPUT_KEYBOARD;
         i.ki.wVk = VK_SHIFT;
@@ -136,6 +133,7 @@ void flushModifiers() {
         SendInput(static_cast<UINT>(ups.size()), ups.data(), sizeof(INPUT));
 }
 
+
 void sendCtrlC() {
     INPUT inputs[4] = {};
 
@@ -146,6 +144,46 @@ void sendCtrlC() {
     inputs[1].ki.wVk = 'C';
     inputs[2] = inputs[1];
     inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+    inputs[3] = inputs[0];
+    inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
+
+    SendInput(4, inputs, sizeof(INPUT));
+}
+
+void selectCurrentLine() {
+    INPUT inputs[3] = {};
+
+    // Press SHIFT
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki.wVk = VK_SHIFT;
+
+    // Press HOME
+    inputs[1].type = INPUT_KEYBOARD;
+    inputs[1].ki.wVk = VK_HOME;
+
+    // Release SHIFT
+    inputs[2] = inputs[0];
+    inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+
+    SendInput(3, inputs, sizeof(INPUT));
+}
+
+void selectAllText() {
+    INPUT inputs[4] = {};
+
+    // Press CTRL down
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki.wVk = VK_CONTROL;
+
+    // Press A
+    inputs[1].type = INPUT_KEYBOARD;
+    inputs[1].ki.wVk = 'A';
+
+    // Release A
+    inputs[2] = inputs[1];
+    inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+
+    // Release CTRL
     inputs[3] = inputs[0];
     inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
 
@@ -317,22 +355,31 @@ void handleClipboardText(const std::wstring &selected) {
     }
 }
 
-bool registerHotkey() {
-    // build a human‐readable name, e.g. "Ctrl+Alt+B"
+std::wstring makeHotkeyName(const UINT modifiers, const UINT vk) {
     std::wstring name;
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_CONTROL) name += L"Ctrl+";
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_ALT) name += L"Alt+";
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_SHIFT) name += L"Shift+";
-    name += static_cast<wchar_t>(config::HOTKEY_VK);
-    if (!RegisterHotKey(nullptr, HOTKEY_ID, config::HOTKEY_MODIFIERS, config::HOTKEY_VK)) {
+    if (modifiers & MOD_CONTROL) name += L"Ctrl+";
+    if (modifiers & MOD_ALT)     name += L"Alt+";
+    if (modifiers & MOD_SHIFT)   name += L"Shift+";
+    if (modifiers & MOD_WIN)     name += L"Win+";
+
+    name += static_cast<wchar_t>(vk);
+    return name;
+}
+
+bool registerHotkey(const int id, const UINT modifiers, const UINT vk) {
+    const std::wstring name = makeHotkeyName(modifiers, vk);
+
+    if (!RegisterHotKey(nullptr, id, modifiers, vk)) {
         if (config::DEBUG_MODE) std::wcerr << L"Failed to register hotkey " << name << L"\n";
         return false;
     }
+
     if (config::DEBUG_MODE) std::wcout << L"Hotkey registered " << name << L"\n";
     return true;
 }
 
-void run_once() {
+void copyAndFlip(const UINT modifiers) {
+    flushModifiers(modifiers);
     const auto selected = copyAndFetchSelection();
     if (selected.empty()) {
         if (config::DEBUG_MODE) std::wcerr << L"No new text selected. Skipping.\n";
