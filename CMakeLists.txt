@@ -4,8 +4,6 @@ set(CMAKE_CXX_STANDARD 20)
 
 # ─── Statically link MinGW runtimes so no extra DLLs are needed ───
 if (MINGW)
-    # -static links the C runtime
-    # -static-libgcc / -static-libstdc++ embed libgcc and libstdc++
     set(CMAKE_EXE_LINKER_FLAGS
             "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
 endif()
@@ -13,7 +11,12 @@ endif()
 add_executable(language_flipper
         main.cpp
         utils.cpp
-        utils.h
-        config.h
         config.cpp
+)
+
+add_custom_command(
+        TARGET language_flipper POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/config.json
+        $<TARGET_FILE_DIR:language_flipper>
 )

@@ -27,6 +27,22 @@ std::string makeLayoutString(const LANGID id) {
     return buf;
 }
 
+LANGID getLangIdPrimary() {
+    return MAKELANGID(config::LANG_PRIMARY, config::SUBLANG_PRIMARY);
+}
+
+LANGID getLangIdSecondary() {
+    return MAKELANGID(config::LANG_SECONDARY, config::SUBLANG_SECONDARY);
+}
+
+std::string getKLIDPrimary() {
+    return makeLayoutString(getLangIdPrimary());
+}
+
+std::string getKLIDSecondary() {
+    return makeLayoutString(getLangIdSecondary());
+}
+
 // ─── Mapping Tables ────────────────────────────────────────────────────
 
 std::unordered_map<wchar_t, wchar_t> makeSecondaryToPrimaryMap() {
@@ -53,6 +69,7 @@ std::wstring readClipboard() {
     HANDLE hData = GetClipboardData(CF_UNICODETEXT);
     if (hData != nullptr) {
         // 3) Lock the handle to get a pointer
+        // ReSharper disable once CppTooWideScope
         const auto *pWide = static_cast<const wchar_t *>(GlobalLock(hData));
         if (pWide) {
             // 4) Copy into our string
@@ -241,8 +258,8 @@ std::wstring fix(const std::wstring &src, const std::unordered_map<wchar_t, wcha
 
 LayoutRole detectLayout() {
     const LANGID id = activeLang();
-    if (id == LANGID_PRIMARY) return LayoutRole::Primary;
-    if (id == LANGID_SECONDARY) return LayoutRole::Secondary;
+    if (id == getLangIdPrimary()) return LayoutRole::Primary;
+    if (id == getLangIdSecondary()) return LayoutRole::Secondary;
     return LayoutRole::Unsupported;
 }
 
@@ -251,7 +268,7 @@ std::wstring transformText(const std::wstring &input, const LayoutRole from) {
         case LayoutRole::Primary:
             return fix(input, config::KEYMAP_PRIMARY_TO_SECONDARY); // primary→secondary map
         case LayoutRole::Secondary:
-            return fix(input, KEYMAP_SECONDARY_TO_PRIMARY); // secondary→primary map
+            return fix(input, makeSecondaryToPrimaryMap()); // secondary→primary map
         default:
             return input;
     }
@@ -298,28 +315,30 @@ bool switchKeyboardLayout(const std::string_view layoutId) {
 
 bool flipLayout(const LayoutRole from) {
     bool ok = false;
-    const std::wstring &fromName = (from == LayoutRole::Primary)
-                                       ? config::ROLE_NAME_PRIMARY
-                                       : (from == LayoutRole::Secondary)
-                                             ? config::ROLE_NAME_SECONDARY
-                                             : L"Unknown";
+    const std::wstring &fromName =
+            (from == LayoutRole::Primary)
+                ? config::ROLE_NAME_PRIMARY
+                : (from == LayoutRole::Secondary)
+                      ? config::ROLE_NAME_SECONDARY
+                      : L"Unknown";
 
-    const std::wstring &toName = (from == LayoutRole::Primary)
-                                     ? config::ROLE_NAME_SECONDARY
-                                     : (from == LayoutRole::Secondary)
-                                           ? config::ROLE_NAME_PRIMARY
-                                           : L"Unknown";
+    const std::wstring &toName =
+            (from == LayoutRole::Primary)
+                ? config::ROLE_NAME_SECONDARY
+                : (from == LayoutRole::Secondary)
+                      ? config::ROLE_NAME_PRIMARY
+                      : L"Unknown";
 
     // do the flip
     if (from == LayoutRole::Primary) {
-        ok = switchKeyboardLayout(KLID_SECONDARY);
+        ok = switchKeyboardLayout(getKLIDSecondary());
     } else if (from == LayoutRole::Secondary) {
-        ok = switchKeyboardLayout(KLID_PRIMARY);
+        ok = switchKeyboardLayout(getKLIDPrimary());
     }
 
     // log the result using macro
     if (ok) {
-        DEBUG_PRINT(L"Layout flipped ► " << fromName << L"→" << toName);
+        DEBUG_PRINT(L"Layout flipped: " << fromName << L"→" << toName);
     } else {
         DEBUG_PRINT(L"Flip from " << fromName << L" to " << toName << L" failed");
     }
@@ -333,7 +352,7 @@ bool flipLayout(const LayoutRole from) {
 void handleClipboardText(const std::wstring &selected) {
     const auto layout = detectLayout();
     if (layout == LayoutRole::Unsupported) {
-        if (config::DEBUG_MODE) std::wcerr << L"Unsupported layout. Aborting.\n";
+        DEBUG_PRINT(L"Unsupported layout. Aborting.\n");
         return;
     }
 
