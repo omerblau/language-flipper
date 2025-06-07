@@ -1,7 +1,7 @@
 // this is config.h
 #pragma once
 
-#include "json.hpp"
+#include "third_party/json/json.hpp"
 #include <windows.h>        // for WORD, LANG_* and SUBLANG_* macros
 #include <unordered_map>
 #include <string>

@@ -1,6 +1,6 @@
 #include "config.h"
 #include "utils.h"
-#include "json.hpp"
+#include "third_party/json/json.hpp"
 
 #include <fstream>
 #include <iostream>
