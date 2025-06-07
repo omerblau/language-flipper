@@ -6,13 +6,19 @@ set(CMAKE_CXX_STANDARD 20)
 if (MINGW)
     set(CMAKE_EXE_LINKER_FLAGS
             "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
-endif()
+endif ()
 
 add_executable(language_flipper
         main.cpp
         utils.cpp
         config.cpp
 )
+
+set_target_properties(language_flipper PROPERTIES OUTPUT_NAME "Language Flipper")
+
+if (WIN32)
+    target_sources(language_flipper PRIVATE app_icon.rc)
+endif ()
 
 add_custom_command(
         TARGET language_flipper POST_BUILD
