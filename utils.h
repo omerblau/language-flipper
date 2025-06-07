@@ -17,25 +17,21 @@
 enum class LayoutRole { Primary, Secondary, Unsupported };
 
 /// Build the LANGIDs from your config (no more MAKELANGID in main code).
-constexpr LANGID LANGID_PRIMARY = MAKELANGID(config::LANG_PRIMARY, config::SUBLANG_PRIMARY);
-constexpr LANGID LANGID_SECONDARY = MAKELANGID(config::LANG_SECONDARY, config::SUBLANG_SECONDARY);
+LANGID getLangIdPrimary();
+
+LANGID getLangIdSecondary();
+
+std::string getKLIDPrimary();
+
+std::string getKLIDSecondary();
 
 /// Convert a LANGID (e.g. 0x0409) to its 8-digit KLID string ("00000409").
 std::string makeLayoutString(LANGID id);
-
-/// The two layout-ID strings ready to pass to LoadKeyboardLayoutA()
-inline const std::string KLID_PRIMARY = makeLayoutString(LANGID_PRIMARY);
-inline const std::string KLID_SECONDARY = makeLayoutString(LANGID_SECONDARY);
-
 
 // ─── Mapping Tables ────────────────────────────────────────────────────
 
 /// Generate Secondary→Primary map from your config’s Primary→Secondary map
 std::unordered_map<wchar_t, wchar_t> makeSecondaryToPrimaryMap();
-
-/// The reverse mapping (auto-generated at startup)
-inline const std::unordered_map<wchar_t, wchar_t> KEYMAP_SECONDARY_TO_PRIMARY
-        = makeSecondaryToPrimaryMap();
 
 
 // ─── Clipboard Helpers ─────────────────────────────────────────────────
