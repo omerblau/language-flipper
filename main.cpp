@@ -7,6 +7,8 @@
 #include <fcntl.h>   // _O_U16TEXT
 #include <io.h>      // _setmode
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 int main() {
     if (config::DEBUG_MODE) {
@@ -34,15 +36,23 @@ int main() {
         if (msg.message == WM_HOTKEY) {
             switch (msg.wParam) {
                 case config::BASIC_HOTKEY_ID:
-                    copyAndFlip(config::BASIC_HOTKEY_MODIFIERS); // or run_basic()
+                    std::wcout << L"Basic Case: \n";
+                    flushModifiers(config::BASIC_HOTKEY_MODIFIERS);
+                    copyAndFlip();
                     break;
                 case config::LINE_HOTKEY_ID:
+                    std::wcout << L"Line Case: \n";
+                    flushModifiers(config::LINE_HOTKEY_MODIFIERS);
                     selectCurrentLine();
-                    copyAndFlip(config::LINE_HOTKEY_MODIFIERS);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                    copyAndFlip();
                     break;
                 case config::ALL_HOTKEY_ID:
+                    std::wcout << L"All Case: \n";
+                    flushModifiers(config::ALL_HOTKEY_MODIFIERS);
                     selectAllText();
-                    copyAndFlip(config::ALL_HOTKEY_MODIFIERS);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                    copyAndFlip();
                     break;
                 default: ;
             }

@@ -8,6 +8,9 @@
 #include <unordered_map>
 #include <windows.h>   // for LANGID
 
+
+#define DEBUG_PRINT(msg) do { if (config::DEBUG_MODE) std::wcout << msg << std::endl; } while (0)
+
 // ─── Layout Roles & IDs ────────────────────────────────────────────────
 
 /// Which role the current layout is playing in the swap.
@@ -106,4 +109,4 @@ std::wstring makeHotkeyName(UINT modifiers, UINT vk);
 bool registerHotkey(int id, UINT modifiers, UINT vk);
 
 /// Run a single cycle: copy, transform, type (and optionally flip).
-void copyAndFlip(UINT modifiers);
+void copyAndFlip();

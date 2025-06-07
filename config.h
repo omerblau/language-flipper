@@ -1,3 +1,4 @@
+// this is config.h
 #pragma once
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -13,7 +14,7 @@ namespace config {
     // ─── Debug / console toggle ────────────────────────────────────
     // false → run entirely hidden, no console, no prints
     // true  → keep console open, show all prints
-    constexpr bool DEBUG_MODE = false;
+    constexpr bool DEBUG_MODE = true;
 
 
     // ─── Primary / “from” Layout ─────────────────────────────────────────────
