@@ -51,7 +51,7 @@ Switching layouts, re-typing, or copy-pasting into online converters breaks your
 **All runtime options now live in a simple file: [`config.json`](./config.json)** —  
 not in a `.h` file! This makes tweaking layouts, keymaps, and hotkeys as easy as editing a text file (no coding or recompiling).
 
-> 💡 A full configuration guide is included as [`res/config_readme.md`](./res/config_readme.md).  
+> 💡 A full configuration guide is included as [`res/confing_readme.md`](./res/confing_readme.md).  
 > See it for detailed instructions, examples, and code snippets.
 
 | Setting                         | Purpose                                                 | Example / Default                   |
