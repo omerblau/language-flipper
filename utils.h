@@ -8,6 +8,9 @@
 #include <unordered_map>
 #include <windows.h>   // for LANGID
 
+
+#define DEBUG_PRINT(msg) do { if (config::DEBUG_MODE) std::wcout << msg << std::endl; } while (0)
+
 // ─── Layout Roles & IDs ────────────────────────────────────────────────
 
 /// Which role the current layout is playing in the swap.
@@ -17,9 +20,8 @@ enum class LayoutRole { Primary, Secondary, Unsupported };
 constexpr LANGID LANGID_PRIMARY = MAKELANGID(config::LANG_PRIMARY, config::SUBLANG_PRIMARY);
 constexpr LANGID LANGID_SECONDARY = MAKELANGID(config::LANG_SECONDARY, config::SUBLANG_SECONDARY);
 
-constexpr int  HOTKEY_ID = 1;
 /// Convert a LANGID (e.g. 0x0409) to its 8-digit KLID string ("00000409").
-std::string makeLayoutString(const LANGID id);
+std::string makeLayoutString(LANGID id);
 
 /// The two layout-ID strings ready to pass to LoadKeyboardLayoutA()
 inline const std::string KLID_PRIMARY = makeLayoutString(LANGID_PRIMARY);
@@ -51,10 +53,17 @@ std::wstring copyAndFetchSelection();
 // ─── Input Simulation ──────────────────────────────────────────────────
 
 /// Release any stuck Ctrl/Alt/Shift modifiers based on HOTKEY_MODIFIERS.
-void flushModifiers();
+void flushModifiers(UINT modifiers);
+
 
 /// Simulate a Ctrl+C keystroke to copy the current selection.
 void sendCtrlC();
+
+
+void selectCurrentLine();
+
+
+void selectAllText();
 
 /// Type out a wide string as Unicode input events.
 void typeText(const std::wstring &text);
@@ -76,16 +85,16 @@ LayoutRole detectLayout();
 std::wstring transformText(const std::wstring &input, LayoutRole from);
 
 /// Log “orig → transformed” using ROLE_NAME_PRIMARY/SECONDARY from config.
-void logTransformation(const std::wstring &orig, const std::wstring &transformed, const LayoutRole from);
+void logTransformation(const std::wstring &orig, const std::wstring &transformed, LayoutRole from);
 
 
 // ─── Switching (optional) ──────────────────────────────────────────────
 
 /// Broadcast WM_INPUTLANGCHANGEREQUEST for a given KLID string.
-bool switchKeyboardLayout(const std::string_view layoutId);
+bool switchKeyboardLayout(std::string_view layoutId);
 
 /// Flip from Primary↔Secondary and log the result.
-bool flipLayout(const LayoutRole from);
+bool flipLayout(LayoutRole from);
 
 
 // ─── Hotkey & Orchestration ────────────────────────────────────────────
@@ -93,8 +102,11 @@ bool flipLayout(const LayoutRole from);
 /// Copy→transform→type→(optional flip) for a single clipboard event.
 void handleClipboardText(const std::wstring &selected);
 
+
+std::wstring makeHotkeyName(UINT modifiers, UINT vk);
+
 /// Register the hotkey as defined in config (ID, modifiers, virtual key).
-bool registerHotkey();
+bool registerHotkey(int id, UINT modifiers, UINT vk);
 
 /// Run a single cycle: copy, transform, type (and optionally flip).
-void run_once();
+void copyAndFlip();

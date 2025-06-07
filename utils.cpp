@@ -86,9 +86,6 @@ DWORD waitForClipboardChange(const DWORD previousSequence) {
 }
 
 std::wstring copyAndFetchSelection() {
-    // clear any stuck modifiers
-    flushModifiers();
-
     const DWORD before = GetClipboardSequenceNumber();
 
     sendCtrlC();
@@ -106,25 +103,25 @@ std::wstring copyAndFetchSelection() {
 // ─── Input Simulation ──────────────────────────────────────────────────
 
 // Release any stuck modifier keys (Ctrl, Alt, Shift) in one batched SendInput call
-void flushModifiers() {
+void flushModifiers(UINT modifiers) {
     std::vector<INPUT> ups;
     ups.reserve(3);
 
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_CONTROL) {
+    if (modifiers & MOD_CONTROL) {
         INPUT i{};
         i.type = INPUT_KEYBOARD;
         i.ki.wVk = VK_CONTROL;
         i.ki.dwFlags = KEYEVENTF_KEYUP;
         ups.push_back(i);
     }
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_ALT) {
+    if (modifiers & MOD_ALT) {
         INPUT i{};
         i.type = INPUT_KEYBOARD;
         i.ki.wVk = VK_MENU;
         i.ki.dwFlags = KEYEVENTF_KEYUP;
         ups.push_back(i);
     }
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_SHIFT) {
+    if (modifiers & MOD_SHIFT) {
         INPUT i{};
         i.type = INPUT_KEYBOARD;
         i.ki.wVk = VK_SHIFT;
@@ -136,6 +133,7 @@ void flushModifiers() {
         SendInput(static_cast<UINT>(ups.size()), ups.data(), sizeof(INPUT));
 }
 
+
 void sendCtrlC() {
     INPUT inputs[4] = {};
 
@@ -146,6 +144,50 @@ void sendCtrlC() {
     inputs[1].ki.wVk = 'C';
     inputs[2] = inputs[1];
     inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+    inputs[3] = inputs[0];
+    inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
+
+    SendInput(4, inputs, sizeof(INPUT));
+}
+
+void selectCurrentLine() {
+    INPUT inputs[4] = {};
+
+    // Press SHIFT
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki.wVk = VK_SHIFT;
+
+    // Press HOME
+    inputs[1].type = INPUT_KEYBOARD;
+    inputs[1].ki.wVk = VK_HOME;
+
+    // Release HOME
+    inputs[2] = inputs[1];
+    inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+
+    // Release SHIFT
+    inputs[3] = inputs[0];
+    inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
+
+    SendInput(4, inputs, sizeof(INPUT));
+}
+
+void selectAllText() {
+    INPUT inputs[4] = {};
+
+    // Press CTRL down
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki.wVk = VK_CONTROL;
+
+    // Press A
+    inputs[1].type = INPUT_KEYBOARD;
+    inputs[1].ki.wVk = 'A';
+
+    // Release A
+    inputs[2] = inputs[1];
+    inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+
+    // Release CTRL
     inputs[3] = inputs[0];
     inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
 
@@ -216,26 +258,18 @@ std::wstring transformText(const std::wstring &input, const LayoutRole from) {
 }
 
 void logTransformation(const std::wstring &orig, const std::wstring &transformed, const LayoutRole from) {
-    // Always show the selected text
-    std::wcout << L"selected: " << orig << L'\n';
-
+    DEBUG_PRINT(L"selected: " << orig);
     // Choose labels based on the role
     if (from == LayoutRole::Primary) {
         // primary → secondary
-        std::wcout
-                << config::ROLE_NAME_PRIMARY
-                << L"→"
-                << config::ROLE_NAME_SECONDARY
-                << L": " << transformed << L'\n';
+        DEBUG_PRINT(config::ROLE_NAME_PRIMARY << L"→"
+            << config::ROLE_NAME_SECONDARY << L": " << transformed);
     } else if (from == LayoutRole::Secondary) {
         // secondary → primary
-        std::wcout
-                << config::ROLE_NAME_SECONDARY
-                << L"→"
-                << config::ROLE_NAME_PRIMARY
-                << L": " << transformed << L'\n';
+        DEBUG_PRINT(config::ROLE_NAME_SECONDARY << L"→" <<
+            config::ROLE_NAME_PRIMARY << L": " << transformed);
     } else {
-        if (config::DEBUG_MODE) std::wcout << L"Unsupported role. Output: " << transformed << L'\n';
+        DEBUG_PRINT(L"Unsupported role. Output: " << transformed);
     }
 }
 
@@ -264,19 +298,17 @@ bool switchKeyboardLayout(const std::string_view layoutId) {
 
 bool flipLayout(const LayoutRole from) {
     bool ok = false;
-    const std::wstring &fromName =
-            (from == LayoutRole::Primary)
-                ? config::ROLE_NAME_PRIMARY
-                : (from == LayoutRole::Secondary)
-                      ? config::ROLE_NAME_SECONDARY
-                      : L"Unknown";
+    const std::wstring &fromName = (from == LayoutRole::Primary)
+                                       ? config::ROLE_NAME_PRIMARY
+                                       : (from == LayoutRole::Secondary)
+                                             ? config::ROLE_NAME_SECONDARY
+                                             : L"Unknown";
 
-    const std::wstring &toName =
-            (from == LayoutRole::Primary)
-                ? config::ROLE_NAME_SECONDARY
-                : (from == LayoutRole::Secondary)
-                      ? config::ROLE_NAME_PRIMARY
-                      : L"Unknown";
+    const std::wstring &toName = (from == LayoutRole::Primary)
+                                     ? config::ROLE_NAME_SECONDARY
+                                     : (from == LayoutRole::Secondary)
+                                           ? config::ROLE_NAME_PRIMARY
+                                           : L"Unknown";
 
     // do the flip
     if (from == LayoutRole::Primary) {
@@ -285,13 +317,11 @@ bool flipLayout(const LayoutRole from) {
         ok = switchKeyboardLayout(KLID_PRIMARY);
     }
 
-    // log the result
-    if (config::DEBUG_MODE) {
-        if (ok) {
-            std::wcout << L"Layout flipped ► " << fromName << L"→" << toName << L"\n";
-        } else {
-            std::wcout << L"Flip from " << fromName << L" to " << toName << L" failed\n";
-        }
+    // log the result using macro
+    if (ok) {
+        DEBUG_PRINT(L"Layout flipped ► " << fromName << L"→" << toName);
+    } else {
+        DEBUG_PRINT(L"Flip from " << fromName << L" to " << toName << L" failed");
     }
 
     return ok;
@@ -317,22 +347,30 @@ void handleClipboardText(const std::wstring &selected) {
     }
 }
 
-bool registerHotkey() {
-    // build a human‐readable name, e.g. "Ctrl+Alt+B"
+std::wstring makeHotkeyName(const UINT modifiers, const UINT vk) {
     std::wstring name;
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_CONTROL) name += L"Ctrl+";
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_ALT) name += L"Alt+";
-    if constexpr (config::HOTKEY_MODIFIERS & MOD_SHIFT) name += L"Shift+";
-    name += static_cast<wchar_t>(config::HOTKEY_VK);
-    if (!RegisterHotKey(nullptr, HOTKEY_ID, config::HOTKEY_MODIFIERS, config::HOTKEY_VK)) {
-        if (config::DEBUG_MODE) std::wcerr << L"Failed to register hotkey " << name << L"\n";
+    if (modifiers & MOD_CONTROL) name += L"Ctrl+";
+    if (modifiers & MOD_ALT) name += L"Alt+";
+    if (modifiers & MOD_SHIFT) name += L"Shift+";
+    if (modifiers & MOD_WIN) name += L"Win+";
+
+    name += static_cast<wchar_t>(vk);
+    return name;
+}
+
+bool registerHotkey(const int id, const UINT modifiers, const UINT vk) {
+    const std::wstring name = makeHotkeyName(modifiers, vk);
+
+    if (!RegisterHotKey(nullptr, id, modifiers, vk)) {
+        DEBUG_PRINT(L"Failed to register hotkey " << name);
         return false;
     }
-    if (config::DEBUG_MODE) std::wcout << L"Hotkey registered " << name << L"\n";
+
+    DEBUG_PRINT(L"Hotkey registered " << name);
     return true;
 }
 
-void run_once() {
+void copyAndFlip() {
     const auto selected = copyAndFetchSelection();
     if (selected.empty()) {
         if (config::DEBUG_MODE) std::wcerr << L"No new text selected. Skipping.\n";
